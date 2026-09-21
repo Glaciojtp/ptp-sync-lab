@@ -41,12 +41,16 @@ def compute_jitter(offsets):
 def query_pmc(socket_path):
     """Consulta directa a ptp4l mediante PMC (PTP Management Client)"""
     try:
-        cmd = ["pmc", "-u", "-b", "0", "-s", socket_path, "GET TIME_STATUS_NP"]
+        # Usamos socket de solo lectura /var/run/ptp4lro si existe y creamos el socket temporal en /tmp
+        actual_socket = "/var/run/ptp4lro" if os.path.exists("/var/run/ptp4lro") else socket_path
+        tmp_socket = f"/tmp/pmc.{os.getpid()}"
+        cmd = ["pmc", "-u", "-b", "0", "-i", tmp_socket, "-s", actual_socket, "GET TIME_STATUS_NP"]
         res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=1.5)
         if res.returncode != 0:
             return None
 
         out = res.stdout
+        gm_present = "gmPresent                  true" in out
         offset_match = re.search(r"master_offset\s+(-?\d+)", out)
         freq_match = re.search(r"frequency_adjustment\s+(-?\d+)", out)
         delay_match = re.search(r"path_delay\s+(-?\d+)", out)
@@ -55,7 +59,8 @@ def query_pmc(socket_path):
             offset = float(offset_match.group(1))
             freq = float(freq_match.group(1))
             delay = float(delay_match.group(1)) if delay_match else 0.0
-            return offset, freq, delay, 2.0 # Slave state
+            state = 2.0 if gm_present else 1.0 # 2=Synchronized Slave, 1=Listening (esperando sync)
+            return offset, freq, delay, state
     except Exception:
         pass
     return None
