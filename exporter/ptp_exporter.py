@@ -79,10 +79,17 @@ def run_demo_simulation():
     return offset, freq, delay, state
 
 def metrics_collector_loop(socket_path, is_demo):
+    socket_warned = False
     while True:
         data = None
-        if not is_demo and os.path.exists(socket_path):
+        socket_found = os.path.exists(socket_path) or os.path.exists("/var/run/ptp4lro")
+        if not is_demo and socket_found:
             data = query_pmc(socket_path)
+        elif not is_demo and not socket_found and not socket_warned:
+            print(f"[!] AVISO: No se encontro socket ptp4l en {socket_path} ni /var/run/ptp4lro.")
+            print("    Si estas en tu PC o una maquina sin ptp4l activo, corre con '--demo' para telemetria sintetica:")
+            print("    python3 exporter/ptp_exporter.py --demo\n")
+            socket_warned = True
 
         if not data and is_demo:
             data = run_demo_simulation()
