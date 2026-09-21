@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Telemetry and data storage
+telemetry/grafana_data/
+telemetry/prometheus_data/
+*.pcap
+*.csv
+*.log
+
+# Editor and OS
+.vscode/
+.idea/
+.DS_Store
+*~
+*.swp
