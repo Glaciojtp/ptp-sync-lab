@@ -52,6 +52,8 @@ def query_pmc(socket_path):
         cmd = ["pmc", "-u", "-b", "0", "-i", tmp_socket, "-s", actual_socket, "GET TIME_STATUS_NP", "GET CURRENT_DATA_SET"]
         res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=1.5)
         if res.returncode != 0:
+            if "Permission denied" in res.stderr:
+                print("[!] ERROR DE PERMISOS: No se puede acceder al socket ptp4l. Ejecuta el exporter con sudo:\n    sudo python3 exporter/ptp_exporter.py\n")
             return None
 
         out = res.stdout
@@ -91,6 +93,7 @@ def run_demo_simulation():
 
 def metrics_collector_loop(socket_path, is_demo):
     socket_warned = False
+    log_counter = 0
     while True:
         data = None
         socket_found = os.path.exists(socket_path) or os.path.exists("/var/run/ptp4lro")
@@ -117,6 +120,11 @@ def metrics_collector_loop(socket_path, is_demo):
                 current_metrics["ptp_clock_state"] = state
                 current_metrics["ptp_jitter_nanoseconds"] = jitter
                 current_metrics["ptp_sync_packet_count"] += 8
+
+                log_counter += 1
+                if log_counter % 5 == 1:
+                    role_str = "SLAVE (SYNC)" if state == 2.0 else "LISTENING"
+                    print(f"[*] Telemetría PTP viva: Offset={offset:.1f} ns | Jitter={jitter:.1f} ns | Delay={delay:.1f} ns | Estado={role_str}")
             else:
                 current_metrics["ptp_clock_state"] = 0.0 # Faulty
 
