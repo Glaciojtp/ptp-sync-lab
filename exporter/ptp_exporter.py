@@ -40,29 +40,40 @@ def compute_jitter(offsets):
 
 def query_pmc(socket_path):
     """Consulta directa a ptp4l mediante PMC (PTP Management Client)"""
+    tmp_socket = f"/tmp/pmc.{os.getpid()}"
     try:
-        # Usamos socket de solo lectura /var/run/ptp4lro si existe y creamos el socket temporal en /tmp
+        if os.path.exists(tmp_socket):
+            try:
+                os.unlink(tmp_socket)
+            except OSError:
+                pass
+
         actual_socket = "/var/run/ptp4lro" if os.path.exists("/var/run/ptp4lro") else socket_path
-        tmp_socket = f"/tmp/pmc.{os.getpid()}"
-        cmd = ["pmc", "-u", "-b", "0", "-i", tmp_socket, "-s", actual_socket, "GET TIME_STATUS_NP"]
+        cmd = ["pmc", "-u", "-b", "0", "-i", tmp_socket, "-s", actual_socket, "GET TIME_STATUS_NP", "GET CURRENT_DATA_SET"]
         res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=1.5)
         if res.returncode != 0:
             return None
 
         out = res.stdout
-        gm_present = "gmPresent                  true" in out
-        offset_match = re.search(r"master_offset\s+(-?\d+)", out)
-        freq_match = re.search(r"frequency_adjustment\s+(-?\d+)", out)
-        delay_match = re.search(r"path_delay\s+(-?\d+)", out)
+        gm_present = bool(re.search(r"gmPresent\s+true", out, re.IGNORECASE))
+        offset_match = re.search(r"(?:master_offset|offsetFromMaster)\s+([+-]?\d+(?:\.\d+)?)", out)
+        rate_match = re.search(r"cumulativeScaledRateOffset\s+([+-]?\d+(?:\.\d+)?)", out)
+        delay_match = re.search(r"(?:path_delay|meanPathDelay)\s+([+-]?\d+(?:\.\d+)?)", out)
 
-        if offset_match and freq_match:
+        if offset_match:
             offset = float(offset_match.group(1))
-            freq = float(freq_match.group(1))
+            freq = float(rate_match.group(1)) * 1e9 if rate_match else 0.0
             delay = float(delay_match.group(1)) if delay_match else 0.0
             state = 2.0 if gm_present else 1.0 # 2=Synchronized Slave, 1=Listening (esperando sync)
             return offset, freq, delay, state
     except Exception:
         pass
+    finally:
+        if os.path.exists(tmp_socket):
+            try:
+                os.unlink(tmp_socket)
+            except OSError:
+                pass
     return None
 
 def run_demo_simulation():
