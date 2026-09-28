@@ -1,0 +1,18 @@
+[Unit]
+Description=HFT PTP Prometheus Telemetry Exporter
+After=network.target ptp4l-slave.service
+Wants=ptp4l-slave.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/ptp-sync-lab
+ExecStart=/usr/bin/python3 /opt/ptp-sync-lab/exporter/ptp_exporter.py -p 9123
+Restart=always
+RestartSec=5s
+
+# Process and resource tuning
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

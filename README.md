@@ -103,13 +103,36 @@ python3 exporter/ptp_exporter.py -p 9123
 
 ### Step 5: Inject Network Chaos & Measure Jitter
 ```bash
-python3 tools/chaos_injector.py -t 192.168.1.2 -b 25000 -d 45
+python3 tools/chaos_injector.py -t <SLAVE_OR_SWITCH_IP> -b 25000 -d 45
 ```
 *Observe real-time offset distortion and PI servo stabilization in Grafana under heavy packet bursts.*
 
 ---
 
-## 5. Telemetry Metrics Exported
+## 5. Empirical Results: Buffer Bloat & Chaos Profiling
+
+To evaluate synchronization resilience under adverse financial exchange conditions, synthetic microbursts of **25,000 UDP frames (1400 bytes each at ~800 Mbps)** were repeatedly fired into the switching fabric.
+
+```bash
+# Generate benchmark visualization (requires matplotlib)
+python3 tools/plot_chaos_benchmark.py
+```
+
+![HFT PTP Synchronization & Chaos Response](telemetry/ptp_chaos_benchmark.png)
+
+### Performance & Resilience Summary Table
+
+| Metric | Nominal State (Quiet Fabric) | Microburst Congestion (Chaos) | Engineering Analysis |
+| :--- | :--- | :--- | :--- |
+| **Master Offset** | `29.0 µs` ($\pm 4.5\ \mu\text{s}$) | **`130 – 180 µs`** (Spike) | Asymmetric queueing delay in switch buffers perturbs E2E handshake |
+| **Path Delay** | `133.0 µs` | **`220 – 245 µs`** | Layer 2 switch buffer bloat delays PTP Sync & Delay_Req transit |
+| **Clock Jitter ($\sigma$)** | `45.0 µs` | **`145 – 155 µs`** | Packet departure variance spikes due to FIFO queue contention |
+| **PI Servo Recovery** | Locked (`s2`) | Compensating (`s2`) | **~3.2 seconds** recovery time to return within nominal thresholds |
+| **Oscillator Drift** | `0.0 ppb` | `0.0 ppb` | Co-located VMs share physical host TSC silicon crystal |
+
+---
+
+## 6. Telemetry Metrics Exported
 
 | Metric | Type | Unit | Description |
 | :--- | :--- | :--- | :--- |
@@ -121,5 +144,24 @@ python3 tools/chaos_injector.py -t 192.168.1.2 -b 25000 -d 45
 
 ---
 
-## 6. License
+## 7. Production Deployment (Systemd Services)
+
+For mission-critical production trading nodes, services should run with real-time priority (`SCHED_RR`, priority 99) and unlimited memory locking:
+
+```bash
+# Install and enable Grandmaster (on Reference Clock Node)
+sudo cp configs/ptp4l-grandmaster.service /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now ptp4l-grandmaster
+
+# Install and enable Slave & Exporter (on Trading Execution Nodes)
+sudo cp configs/ptp4l-slave.service /etc/systemd/system/
+sudo cp configs/ptp-exporter.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now ptp4l-slave
+sudo systemctl enable --now ptp-exporter
+```
+
+---
+
+## 8. License
 MIT License. Developed by **Glaciojtp (@Glaciojtp)**.

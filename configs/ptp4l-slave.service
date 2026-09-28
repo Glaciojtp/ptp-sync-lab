@@ -1,0 +1,27 @@
+[Unit]
+Description=PTP4L IEEE 1588v2 Slave Clock Service
+Documentation=man:ptp4l(8)
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/ptp4l -f /etc/ptp4l/ptp4l_slave.conf -i eth0 -m
+Restart=always
+RestartSec=3s
+KillMode=process
+
+# Real-Time Scheduling Priority (SCHED_RR for zero context-switch jitter)
+CPUSchedulingPolicy=rr
+CPUSchedulingPriority=99
+
+# Lock physical memory to prevent paging
+LimitMEMLOCK=infinity
+
+# Security Sandbox
+ProtectSystem=full
+ProtectHome=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
