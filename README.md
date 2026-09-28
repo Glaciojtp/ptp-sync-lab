@@ -6,17 +6,16 @@
 
 ---
 
-## 1. Overview
+## 1. Overview & Project Motivation
 
-In electronic trading exchanges and prop shops, market orders, matching engine events, and regulatory audit trails require deterministic timestamping synchronized to UTC with microsecond-to-nanosecond accuracy.
-* Under **MiFID II (RTS 25)**, high-frequency algorithmic trading requires clock synchronization within **$1\ \mu\text{s}$ of UTC** with a maximum divergence of **$100\ \mu\text{s}$** for algorithmic trading.
-* Traditional NTP (Network Time Protocol) relies on software interrupts and suffers from millisecond-level asymmetric network jitter, making it legally and technically inadequate.
+In distributed financial trading platforms, timestamping an execution or a cancellation even a few microseconds out of order can trigger compliance penalties or legal disputes under regulatory frameworks such as MiFID II (RTS 25) and SEC Rule 613 (CAT). These mandates require algorithmic trading venues to maintain clock synchronization within strict tolerances (under $100\ \mu\text{s}$ divergence, with nanosecond resolution).
 
-This repository implements an end-to-end **IEEE 1588v2 PTP Testbed**:
-1. **Grandmaster Clock:** Deployed on Proxmox VE serving high-frequency synchronization pulses.
-2. **Slave Client:** Deployed on trading workstation nodes with servo PI clock discipline.
-3. **Telemetry Pipeline:** Custom Prometheus Exporter polling `ptp4l` internal state at 1 Hz, visualised on an auto-provisioned real-time Grafana dashboard.
-4. **Network Chaos Injector:** Simulates financial market microbursts across an unmanaged Layer 2 switch to evaluate buffer queueing delay and clock servo recovery.
+Standard Internet time protocols like NTP are structurally unsuited for this purpose: variable routing hops, asymmetric transit times, and software interrupt delays produce millisecond-scale jitter.
+
+I designed this testbed to implement, validate, and stress-test physical clock synchronization using the IEEE 1588v2 Precision Time Protocol (PTP) in a realistic Linux environment on Proxmox VE. Beyond running the GrandMaster and Slave daemons, I built:
+1. A zero-dependency Prometheus telemetry exporter to observe clock offset, network path delay, and jitter in real time.
+2. An automated Grafana dashboard configured with visual regulatory compliance thresholds.
+3. A network chaos injector to simulate market data microbursts (flooding the Layer 2 fabric with 25,000 UDP packets per burst) to measure how switch buffer bloat perturbs timekeeping and evaluate the recovery speed of the PI clock servo.
 
 ---
 
